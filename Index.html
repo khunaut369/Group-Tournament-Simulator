@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Football Tournament Simulator</title>
+    <style>
+        /* --- สไตล์เดิมจากแท็บ 1-4 คงไว้ทั้งหมด --- */
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; background-color: #f5f7fa; }
+        .container { background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .tab-buttons { display: flex; border-bottom: 2px solid #ddd; margin-bottom: 20px; }
+        .tab-button { padding: 10px 20px; cursor: pointer; border: none; background: none; font-size: 16px; font-weight: bold; color: #666; outline: none; }
+        .tab-button.active { color: #007bff; border-bottom: 3px solid #007bff; margin-bottom: -2px; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
+        input[type="text"], input[type="number"], select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-family: inherit; }
+        .team-item { display: flex; justify-content: space-between; align-items: center; padding: 15px; background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 4px; margin-bottom: 10px; }
+        .btn-generate { background-color: #28a745; color: white; border: none; padding: 12px 20px; font-size: 16px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 20px; width: 100%; }
+        .fifa-day-section { background-color: #e9ecef; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
+        .fifa-day-row { display: flex; align-items: center; margin-bottom: 8px; }
+        .fifa-day-row label { width: 100px; margin: 0; }
+        .fifa-day-row input { flex-grow: 1; padding: 6px; }
+        .group-container { border: 2px solid #343a40; border-radius: 8px; margin-bottom: 20px; overflow: hidden; }
+        .group-header { background-color: #343a40; color: white; padding: 10px 15px; font-size: 18px; font-weight: bold; }
+        .round-header { background-color: #dee2e6; color: #333; padding: 8px 15px; font-weight: bold; border-bottom: 1px solid #ccc; border-top: 1px solid #ccc;}
+        .match-item { padding: 15px; border-bottom: 1px dashed #ccc; }
+        .match-row { 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    gap: 15px; 
+    margin-bottom: 10px; 
+    position: relative; /* เพิ่ม position: relative เพื่อให้ปุ่มกากบาทอ้างอิงตำแหน่งริมขอบจากแถวนี้ */
+}
+        .team-name { font-size: 16px; font-weight: bold; width: 120px; }
+        .team-name.home { text-align: right; }
+        .team-name.away { text-align: left; }
+        .btn-simulate { background-color: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; min-width: 80px; text-align: center; }
+        .export-code { background-color: #f8f9fa; border: 1px solid #ccc; padding: 8px; font-family: monospace; font-size: 14px; color: #d63384; text-align: center; border-radius: 4px; }
+        /* ค้นหาและแทนที่กลุ่มคลาส .standings-table เดิมทั้งหมดด้วยโค้ดนี้ */
+
+    .standings-table { 
+    width: 100%; 
+    border-collapse: collapse; 
+    margin-top: 15px; 
+    margin-bottom: 30px; 
+    font-size: 15px; 
+    border: 2px solid #495057; /* กรอบตารางด้านนอกเข้มและหนาขึ้น */
+}
+.standings-table th, .standings-table td { 
+    padding: 10px 8px; 
+    border: 1px solid #868e96; /* เส้นแบ่งเซลล์ด้านในสีเข้มและชัดเจนขึ้น */
+    text-align: center; 
+}
+.standings-table th { 
+    background-color: #e9ecef; 
+    color: #212529; 
+    font-weight: bold; 
+    border-bottom: 2px solid #495057; /* เน้นเส้นแบ่งระหว่างหัวตารางกับข้อมูล */
+}
+.standings-table tr:nth-child(even) { 
+    background-color: #f8f9fa; 
+}
+.standings-table td.team-cell { 
+    text-align: left; 
+    font-weight: bold; 
+}
+.standings-table td.pts-cell { 
+    font-weight: bold; 
+    background-color: #e8f4fd; 
+    border-left: 1px solid #868e96; /* เน้นเส้นแบ่งแยกช่องคะแนนรวมให้เห็นชัดขึ้น */
+    }
+
+        /* --- สไตล์เพิ่มเติมสำหรับแท็บ 5 --- */
+        .export-textarea { background-color: #212529; color: #00ff00; font-family: 'Courier New', Courier, monospace; font-size: 14px; resize: vertical; cursor: text; }
+        .btn-copy { background-color: #17a2b8; color: white; border: none; padding: 12px 20px; font-size: 16px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; }
+        .btn-copy:hover { background-color: #138496; }
+        
+        /* สไตล์เพิ่มเติมสำหรับปุ่มล้างข้อมูล (แท็บ 1) */
+    .action-buttons { display: flex; justify-content: space-between; margin-top: 25px; gap: 15px; }
+    .btn-danger { background-color: #dc3545; color: white; border: none; padding: 12px 20px; font-size: 16px; border-radius: 4px; cursor: pointer; font-weight: bold; flex: 1; }
+    .btn-danger:hover { background-color: #c82333; }
+    .btn-warning { background-color: #ffc107; color: #212529; border: none; padding: 12px 20px; font-size: 16px; border-radius: 4px; cursor: pointer; font-weight: bold; flex: 1; }
+    .btn-warning:hover { background-color: #e0a800; }
+
+    /* สไตล์เพิ่มเติมสำหรับปุ่มล้างผลรายคู่ (แท็บ 3) */
+    .btn-clear-match { 
+    background-color: #6c757d; 
+    color: white; 
+    border: none; 
+    border-radius: 4px; 
+    cursor: pointer; 
+    font-size: 12px; 
+    padding: 6px 10px; 
+    font-weight: bold; 
+    position: absolute; /* เพิ่ม position: absolute เพื่อแยกตัวออกจากการจัดกึ่งกลาง */
+    right: 0;           /* ดันปุ่มไปชิดขอบขวาสุดของพื้นที่ */
+}
+.btn-clear-match:hover { 
+    background-color: #5a6268; 
+}
+    /* สไตล์สำหรับการตั้งค่าไฮไลท์แท็บ 1 */
+.highlight-settings { background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 15px; border-radius: 4px; margin-top: 10px; display: none; }
+.highlight-row { display: flex; align-items: center; margin-bottom: 8px; }
+.highlight-row label { width: 140px; margin: 0; font-weight: normal; color: #333; }
+.highlight-row input { width: 80px; padding: 6px; }
+
+/* สไตล์สำหรับแถวตารางที่ถูกไฮไลท์ (แท็บ 4) */
+/* ใช้ !important เพื่อบังคับทับสีเทาสลับบรรทัดเดิม */
+.standings-table tr.highlight-best, .standings-table tr.highlight-best td { 
+    background-color: #d4edda !important; 
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h2>จำลองทัวร์นาเมนต์ฟุตบอล</h2>
+
+    <div class="tab-buttons">
+        <button class="tab-button active" onclick="switchTab('tab1', this)">1. ตั้งค่า</button>
+        <button class="tab-button" onclick="switchTab('tab2', this)">2. จัดการค่าพลัง</button>
+        <button class="tab-button" onclick="switchTab('tab3', this)">3. โปรแกรมแข่ง</button>
+        <button class="tab-button" onclick="switchTab('tab4', this)">4. ตารางคะแนน</button>
+        <button class="tab-button" onclick="switchTab('tab5', this)">5. ส่งออกข้อมูล</button>
+    </div>
+
+    <div id="tab1" class="tab-content active">
+    
+    <div class="form-group">
+    <label for="tournamentName">ชื่อทัวร์นาเมนต์</label>
+    <input type="text" id="tournamentName" placeholder="เช่น abcd, UCL, World Cup" value="tournament">
+    </div>
+    
+        <div class="form-group" style="margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px dashed #ccc;">
+    <label style="color: #007bff;">📂 นำเข้าข้อมูลเซฟทัวร์นาเมนต์ (ไฟล์ .json)</label>
+    <input type="file" id="importSaveFile" accept=".json" onchange="importTournamentData(event)">
+</div>
+        <div class="form-group">
+            <label for="csvInput">ข้อมูลทีม (รูปแบบ CSV: id,ชื่อทีม,กลุ่ม,ovr)</label>
+            <textarea id="csvInput" rows="6" placeholder="DAI,ไดโบนีเซีย,1,99&#10;THA,ไทย,1,75&#10;JPN,ญี่ปุ่น,2,82" onblur="if(document.getElementById('enableBestHighlight').checked) generateHighlightInputs()"></textarea>
+        </div>
+        <div class="form-group">
+            <label for="rounds">จำนวนรอบการแข่งขัน (พบกันกี่ครั้ง)</label>
+            <input type="number" id="rounds" min="1" value="2">
+        </div>
+        <div class="form-group">
+            <label for="coefficient">ค่าสัมประสิทธิ์ทัวร์นาเมนต์</label>
+            <input type="number" id="coefficient" min="1" value="35" oninput="updateCoefficientUI(this.value)">
+        </div>
+        <div class="form-group">
+            <label for="tiebreaker">กฎไทเบรกเกอร์ (กรณีแต้มเท่ากัน)</label>
+            <select id="tiebreaker">
+                <option value="direct">โดยตรง (พิจารณาผลต่างประตูและประตูได้ก่อน)</option>
+                <option value="h2h">เฮดทูเฮด (พิจารณาผลการพบกันเอง/มินิลีกก่อน)</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-top: 25px; border-top: 1px solid #eee; padding-top: 15px;">
+    <label style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
+        <input type="checkbox" id="enableBestHighlight" onchange="toggleHighlightSettings()" style="width: 20px; height: 20px; margin: 0;">
+        เปิดใช้งานระบบไฮไลท์ทีมผลงานดีที่สุดข้ามกลุ่ม
+    </label>
+    
+    <div id="highlightSettingsContainer" class="highlight-settings">
+        <p style="font-size: 13px; color: #666; margin-top: 0; margin-bottom: 15px;">
+            กำหนดจำนวนทีมที่ต้องการให้ไฮไลท์ในตารางคะแนน (ค่าเริ่มต้นคือ 0 = ไม่ไฮไลท์)<br>
+            *ระบบจะเรียงลำดับจาก: คะแนนรวม -> ผลต่างประตู -> ประตูได้
+        </p>
+        <div id="highlightInputs">
+            </div>
+    </div>
+    </div>
+    <div class="form-group" style="margin-top: 25px; border-top: 1px solid #eee; padding-top: 15px;">
+    <label style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
+        <input type="checkbox" id="enableAutoOvr" onchange="toggleAutoOvrSettings()" style="width: 20px; height: 20px; margin: 0;">
+        เปิดใช้งานระบบปรับ OVR อัตโนมัติตามผลการแข่งขัน
+    </label>
+    
+    <div id="autoOvrSettingsContainer" class="highlight-settings">
+        <p style="font-size: 13px; color: #666; margin-top: 0; margin-bottom: 15px;">
+            กำหนดค่าพลังที่จะถูกปรับสะสมตามผลในแต่ละนัด (กรอกตัวเลขจำนวนเต็มบวก/ลบ เช่น 1 หรือ -1)<br>
+            *ระบบจะประมวลผลจากจำนวนรวมของนัดที่สุ่มแล้ว โดยค่าพลังปัจจุบันจะตันที่ 1 และ 99 เสมอ
+        </p>
+        <div class="highlight-row">
+            <label>ชนะ (Win) :</label>
+            <input type="number" id="ovr_adj_win" value="0" onchange="if(typeof refreshDynamicOvrUI === 'function') refreshDynamicOvrUI()">
+        </div>
+        <div class="highlight-row">
+            <label>เสมอ (Draw) :</label>
+            <input type="number" id="ovr_adj_draw" value="0" onchange="if(typeof refreshDynamicOvrUI === 'function') refreshDynamicOvrUI()">
+        </div>
+        <div class="highlight-row">
+            <label>แพ้ (Loss) :</label>
+            <input type="number" id="ovr_adj_loss" value="0" onchange="if(typeof refreshDynamicOvrUI === 'function') refreshDynamicOvrUI()">
+        </div>
+    </div>
+    </div>
+        <div class="action-buttons">
+    <button class="btn-danger" onclick="clearAllData()">🗑️ ล้างข้อมูลทั้งหมด</button>
+    <button class="btn-warning" onclick="clearAllResults()">🔄 ล้างผลการแข่งขัน</button>
+</div>
+    </div>
+    
+    <div id="tab2" class="tab-content">
+        <div id="teamListContainer"></div>
+    </div>
+
+    <div id="tab3" class="tab-content">
+        <button class="btn-generate" onclick="generateFixtures()">🎲 สุ่มจัดโปรแกรมการแข่งขัน</button>
+        <div id="fifaDayContainer" class="fifa-day-section" style="display: none;"></div>
+        <div id="fixturesContainer"></div>
+    </div>
+
+    <div id="tab4" class="tab-content">
+        <div id="standingsContainer">
+            <p style="color: #666; text-align: center;">กรุณากดสุ่มจัดโปรแกรมการแข่งขันและจำลองผลแข่งเพื่อดูตารางคะแนน</p>
+        </div>
+    </div>
+
+    <div id="tab5" class="tab-content">
+    <p style="font-weight: bold; color: #333;">รหัสอ้างอิงผลการแข่งขัน (แสดงเฉพาะคู่ที่สุ่มผลแล้ว)</p>
+    <p style="font-size: 14px; color: #666;">รูปแบบ: ฟีฟ่าเดย์, ทีม1, ผลการแข่ง, ทีม2, ค่าสัมประสิทธิ์, g</p>
+    <textarea id="exportDataOutput" class="export-textarea" rows="8" readonly></textarea>
+    <button class="btn-copy btn-copy-code" onclick="copyExportData()">📋 คัดลอกรหัสอ้างอิง</button>
+    
+    <p style="font-weight: bold; color: #333; margin-top: 25px;">ผลการแข่งขันในเวลา (แสดงเฉพาะคู่ที่สุ่มผลแล้ว)</p>
+    <p style="font-size: 14px; color: #666;">รูปแบบ: ฟีฟ่าเดย์, id1, score1, score2, id2, x, x</p>
+    <textarea id="exportScoresOutput" class="export-textarea" rows="8" readonly></textarea>
+    <button class="btn-copy btn-copy-scores" onclick="copyExportScores()">📋 คัดลอกผลการแข่งขันในเวลา</button>
+
+    <hr style="margin: 30px 0; border: 1px solid #ddd;">
+    <p style="font-weight: bold; color: #333;">บันทึกความคืบหน้า</p>
+    <p style="font-size: 14px; color: #666;">ส่งออกข้อมูลทัวร์นาเมนต์ การตั้งค่า และผลการแข่งขันทั้งหมดเป็นไฟล์เซฟ เพื่อนำกลับมาโหลดใช้งานใหม่ภายหลัง</p>
+    <button class="btn-export-save" onclick="exportTournamentSave()" style="background-color: #fd7e14; color: white; border: none; padding: 12px 20px; font-size: 16px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%;">
+        💾 ส่งออกไฟล์เซฟทัวร์นาเมนต์ (.json)
+    </button>
+</div>
+</div>
+
+<script src="script.js"></script>
+<script src="tab3.js"></script>
+<script src="tab4.js"></script>
+<script src="tab5.js"></script> </body>
+</html>
