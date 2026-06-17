@@ -5,6 +5,7 @@
 
 // 1. ฟังก์ชันสร้างข้อความส่งออก (ดึงข้อมูลแสดงผลทั้ง 2 กล่องพร้อมกัน)
 // ฟังก์ชันสร้างข้อความส่งออก (เวอร์ชันเพิ่มฟีฟ่าเดย์นำหน้าผลในเวลา)
+// ฟังก์ชันสร้างข้อความส่งออก (เวอร์ชันอัปเดตเรียงลำดับจาก รอบฟีฟ่าเดย์ (fd) -> กลุ่ม -> คู่)
 function renderExportData() {
     const outputArea = document.getElementById('exportDataOutput');
     const scoresArea = document.getElementById('exportScoresOutput');
@@ -17,36 +18,43 @@ function renderExportData() {
         return;
     }
 
-    let exportLines = []; // เก็บข้อความรหัสอ้างอิงเดิม
-    let scoreLines = [];  // เก็บข้อความผลสกอร์ในเวลา (fd,id1,score1,score2,id2)
+    let exportLines = []; // เก็บข้อความรหัสอ้างอิง
+    let scoreLines = [];  // เก็บข้อความผลสกอร์ในเวลา
 
-    // เรียงลำดับชื่อกลุ่มให้ออกมาเป็นระเบียบ
+    // เรียงลำดับชื่อกลุ่มให้เป็นระเบียบ (A, B, C หรือ 1, 2, 3)
     const sortedGroups = Object.keys(fixturesData).sort((a, b) => a.localeCompare(b, undefined, {numeric: true}));
 
-    // วนลูปสแกนตามลำดับ: กลุ่ม -> รอบ -> คู่
-    sortedGroups.forEach(group => {
-        fixturesData[group].forEach((roundMatches, roundIndex) => {
-            
-            // 1. ดึงค่าฟีฟ่าเดย์ของรอบนั้นๆ มารอไว้ก่อนคำนวณรายคู่
-            const roundNum = roundIndex + 1;
-            const fdInput = document.getElementById(`fifaDayInput_R${roundNum}`);
-            const fdValue = fdInput ? (fdInput.value || "...") : "...";
+    // วนลูปสแกนตามลำดับใหม่: รอบ (fd) -> กลุ่ม -> คู่
+    for (let roundIndex = 0; roundIndex < maxRoundsGlobal; roundIndex++) {
+        
+        // 1. ดึงค่าฟีฟ่าเดย์ของรอบปัจจุบัน (fd) มารอไว้
+        const roundNum = roundIndex + 1;
+        const fdInput = document.getElementById(`fifaDayInput_R${roundNum}`);
+        const fdValue = fdInput ? (fdInput.value || "...") : "...";
 
-            roundMatches.forEach((match, matchIndex) => {
-                // คัดกรองเอาเฉพาะคู่การแข่งขันที่มีการสุ่มผลสกอร์เรียบร้อยแล้ว
-                if (match.scoreHome !== null && match.scoreAway !== null) {
-                    
-                    // แถวรหัสอ้างอิงเดิม (ตัวบน)
-                    if (match.resultExport) {
-                        exportLines.push(match.resultExport);
+        // 2. วนลูปเจาะเข้าไปดูผลการแข่งขันของทุกกลุ่ม 'เฉพาะในรอบนี้'
+        sortedGroups.forEach(group => {
+            
+            // ตรวจสอบว่ากลุ่มนี้มีโปรแกรมแข่งในรอบนี้หรือไม่ (ป้องกัน error กรณีจำนวนทีมแต่ละกลุ่มไม่เท่ากัน)
+            if (fixturesData[group] && fixturesData[group][roundIndex]) {
+                const roundMatches = fixturesData[group][roundIndex];
+
+                roundMatches.forEach((match, matchIndex) => {
+                    // คัดกรองเอาเฉพาะคู่การแข่งขันที่มีการสุ่มผลสกอร์เรียบร้อยแล้ว
+                    if (match.scoreHome !== null && match.scoreAway !== null) {
+                        
+                        // แถวรหัสอ้างอิง (ตัวบน)
+                        if (match.resultExport) {
+                            exportLines.push(match.resultExport);
+                        }
+                        
+                        // แถวผลสกอร์ในเวลา (ตัวล่าง): รูปแบบ fd,id1,score1,score2,id2,x,x
+                        scoreLines.push(`${fdValue},${match.home.id},${match.scoreHome},${match.scoreAway},${match.away.id},x,x`);
                     }
-                    
-                    // แถวผลสกอร์ในเวลา: เติม fdValue นำหน้า และห้อยท้ายด้วย ,x,x 
-                    scoreLines.push(`${fdValue},${match.home.id},${match.scoreHome},${match.scoreAway},${match.away.id},x,x`);
-                }
-            });
+                });
+            }
         });
-    });
+    }
 
     const emptyMsg = "ยังไม่มีคู่ใดถูกสุ่มผลการแข่งขัน กรุณากดสุ่มผลในแท็บที่ 3 ก่อนครับ";
 
