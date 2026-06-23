@@ -54,7 +54,10 @@ function updateStandings() {
         allGroupsStandings[group] = sortedTeams;
     }
 
-    // 3. --- ระบบเปรียบเทียบทีมข้ามกลุ่ม (Cross-Group Highlight) ---
+    // แทรกโค้ดบรรทัดนี้ลงไป เพื่อส่งออกตัวแปรให้แท็บ 6 นำไปใช้ต่อได้
+    window.globalAllGroupsStandings = allGroupsStandings;
+
+    // 3. --- ระบบเปรียบเทียบทีมข้ามกลุ่ม (Cross-Group Highlight) --- (นี่คือบรรทัดเดิมของคุณ)
     const isHighlightEnabled = document.getElementById('enableBestHighlight') && document.getElementById('enableBestHighlight').checked;
     
     if (isHighlightEnabled && typeof getHighlightConfig === 'function') {
