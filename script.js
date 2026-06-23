@@ -29,6 +29,13 @@ function switchTab(tabId, buttonElement) {
             renderExportData();
         }
     }
+    
+    // หากเข้าแท็บ 6 ให้คำนวณคะแนนล่าสุดและวาดตารางจัดอันดับรวม
+    if (tabId === 'tab6') {
+        if (typeof updateStandings === 'function') updateStandings(); // อัปเดตข้อมูลตารางก่อน
+        if (typeof renderOverallRanking === 'function') renderOverallRanking(); // วาดแท็บ 6
+    }
+    
 }
 
 function parseCSVAndRenderTeams() {
