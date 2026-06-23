@@ -112,6 +112,12 @@
 .standings-table tr.highlight-best, .standings-table tr.highlight-best td { 
     background-color: #d4edda !important; 
 }
+
+/* สไตล์สำหรับเส้นคั่นหนาระหว่างกลุ่มอันดับ (แท็บ 6) */
+.standings-table tr.thick-bottom-border td {
+    border-bottom: 4px solid #212529 !important;
+}
+
 </style>
 </head>
 <body>
@@ -125,6 +131,7 @@
         <button class="tab-button" onclick="switchTab('tab3', this)">3. โปรแกรมแข่ง</button>
         <button class="tab-button" onclick="switchTab('tab4', this)">4. ตารางคะแนน</button>
         <button class="tab-button" onclick="switchTab('tab5', this)">5. ส่งออกข้อมูล</button>
+        <button class="tab-button" onclick="switchTab('tab6', this)">6. จัดอันดับทีม</button>
     </div>
 
     <div id="tab1" class="tab-content active">
@@ -220,27 +227,48 @@
     </div>
 
     <div id="tab5" class="tab-content">
-    <p style="font-weight: bold; color: #333;">รหัสอ้างอิงผลการแข่งขัน (แสดงเฉพาะคู่ที่สุ่มผลแล้ว)</p>
+    <p style="font-weight: bold; color: #333;">1. รหัสอ้างอิงผลการแข่งขัน (แสดงเฉพาะคู่ที่สุ่มผลแล้ว)</p>
     <p style="font-size: 14px; color: #666;">รูปแบบ: ฟีฟ่าเดย์, ทีม1, ผลการแข่ง, ทีม2, ค่าสัมประสิทธิ์, g</p>
-    <textarea id="exportDataOutput" class="export-textarea" rows="8" readonly></textarea>
+    <textarea id="exportDataOutput" class="export-textarea" rows="6" readonly></textarea>
     <button class="btn-copy btn-copy-code" onclick="copyExportData()">📋 คัดลอกรหัสอ้างอิง</button>
     
-    <p style="font-weight: bold; color: #333; margin-top: 25px;">ผลการแข่งขันในเวลา (แสดงเฉพาะคู่ที่สุ่มผลแล้ว)</p>
+    <p style="font-weight: bold; color: #333; margin-top: 25px;">2. ผลการแข่งขันในเวลา (แสดงเฉพาะคู่ที่สุ่มผลแล้ว)</p>
     <p style="font-size: 14px; color: #666;">รูปแบบ: ฟีฟ่าเดย์, id1, score1, score2, id2, x, x</p>
-    <textarea id="exportScoresOutput" class="export-textarea" rows="8" readonly></textarea>
+    <textarea id="exportScoresOutput" class="export-textarea" rows="6" readonly></textarea>
     <button class="btn-copy btn-copy-scores" onclick="copyExportScores()">📋 คัดลอกผลการแข่งขันในเวลา</button>
+
+    <p style="font-weight: bold; color: #333; margin-top: 25px;">3. โปรแกรมการแข่งขันรายทีมตามฟีฟ่าเดย์ (สรุปแบบตารางตารางเมทริกซ์)</p>
+    <p style="font-size: 14px; color: #666;">รูปแบบ: {"",fd1,fd2;"ชื่อทีม",1,"",...}</p>
+    <textarea id="exportScheduleOutput" class="export-textarea" rows="6" readonly></textarea>
+    <button class="btn-copy btn-copy-schedule" onclick="copyExportSchedule()">📋 คัดลอกโปรแกรมการแข่งขัน</button>
 
     <hr style="margin: 30px 0; border: 1px solid #ddd;">
     <p style="font-weight: bold; color: #333;">บันทึกความคืบหน้า</p>
-    <p style="font-size: 14px; color: #666;">ส่งออกข้อมูลทัวร์นาเมนต์ การตั้งค่า และผลการแข่งขันทั้งหมดเป็นไฟล์เซฟ เพื่อนำกลับมาโหลดใช้งานใหม่ภายหลัง</p>
+    <p style="font-size: 14px; color: #666;">ส่งออกข้อมูลทัวร์นาเมนต์ การตั้งค่า และผลการแข่งขันทั้งหมดเป็นไฟล์เซฟ</p>
     <button class="btn-export-save" onclick="exportTournamentSave()" style="background-color: #fd7e14; color: white; border: none; padding: 12px 20px; font-size: 16px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%;">
         💾 ส่งออกไฟล์เซฟทัวร์นาเมนต์ (.json)
     </button>
 </div>
+
+    <div id="tab6" class="tab-content">
+    <div id="overallStandingsContainer">
+        <p style="color: #666; text-align: center;">กรุณากดสุ่มจัดโปรแกรมการแข่งขันและจำลองผลแข่งเพื่อดูตารางจัดอันดับ</p>
+    </div>
+    
+    <hr style="margin: 30px 0; border: 1px solid #ddd;">
+    <p style="font-weight: bold; color: #333;">ส่งออกรหัส ID ทีมตามอันดับรวม</p>
+    <p style="font-size: 14px; color: #666;">รูปแบบ: {"id1";"id2";...}</p>
+    <textarea id="exportOverallRankingOutput" class="export-textarea" rows="4" readonly></textarea>
+    <button class="btn-copy btn-copy-ranking" onclick="copyExportRanking()" style="background-color: #17a2b8; color: white; border: none; padding: 12px 20px; font-size: 16px; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px;">
+        📋 คัดลอก ID ตามอันดับ
+    </button>
+</div>
+
 </div>
 
 <script src="script.js"></script>
 <script src="tab3.js"></script>
 <script src="tab4.js"></script>
-<script src="tab5.js"></script> </body>
+<script src="tab5.js"></script> 
+<script src="tab6.js"></script></body>
 </html>
