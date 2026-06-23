@@ -1,307 +1,359 @@
-// tab4.js
+// tab3.js
 
-// 1. ฟังก์ชันหลักสำหรับประมวลผลและสร้างตารางคะแนน
-// แทนที่ฟังก์ชันเดิมทั้งหมดใน tab4.js เฉพาะส่วน updateStandings และ renderGroupTableUI
+// ตัวแปรเก็บข้อมูลโปรแกรมแข่งขันและฟีฟ่าเดย์
+let fixturesData = {}; 
+let maxRoundsGlobal = 0; 
 
-function updateStandings() {
-    const container = document.getElementById('standingsContainer');
-    
-    if (!fixturesData || Object.keys(fixturesData).length === 0) {
-        container.innerHTML = '<p style="color: #666; text-align: center;">กรุณากดสุ่มจัดโปรแกรมการแข่งขันในแท็บที่ 3 ก่อนครับ</p>';
+// 1. ฟังก์ชันหลักเมื่อกดปุ่ม "สุ่มจัดโปรแกรมการแข่งขัน"
+// 1. ฟังก์ชันหลักเมื่อกดปุ่ม "สุ่มจัดโปรแกรมการแข่งขัน" (อัปเดตแก้บั๊คข้อมูล)
+function generateFixtures() {
+    // 🔥 แก้บั๊ค: บังคับให้ระบบประมวลผลดึงข้อมูล CSV จากแท็บ 1 ใหม่เสมอทันทีที่กดปุ่ม
+    if (typeof parseCSVAndRenderTeams === 'function') {
+        parseCSVAndRenderTeams();
+    }
+
+    // ตรวจสอบข้อมูลว่าโหลดมาครบถ้วนหรือไม่
+    if (!tournamentTeams || tournamentTeams.length === 0) {
+        alert("กรุณากรอกข้อมูลทีมในแท็บที่ 1 ให้ถูกต้องก่อนครับ\n(รูปแบบ: id,ชื่อทีม,กลุ่ม,ovr)");
         return;
     }
 
-    const tiebreakerMethod = document.getElementById('tiebreaker').value;
-    container.innerHTML = ''; 
+    const coefficient = document.getElementById('coefficient').value || 35;
+    const playRoundsMultiplier = parseInt(document.getElementById('rounds').value) || 1;
+    
+    // จัดกลุ่มทีม (Group By Group)
+    const groupedTeams = {};
+    tournamentTeams.forEach(team => {
+        if (!groupedTeams[team.group]) groupedTeams[team.group] = [];
+        groupedTeams[team.group].push(team);
+    });
 
-    // 1. ตัวแปรเก็บข้อมูลตารางคะแนนที่สมบูรณ์แล้วของ "ทุกกลุ่ม"
-    const allGroupsStandings = {}; 
+    fixturesData = {};
+    maxRoundsGlobal = 0;
 
-    // 2. คำนวณตารางคะแนนแต่ละกลุ่มปกติ
-    for (const group in fixturesData) {
-        let allGroupMatches = [];
-        fixturesData[group].forEach(round => allGroupMatches.push(...round));
+    // สร้างโปรแกรมการแข่งขันของแต่ละกลุ่ม
+    for (const group in groupedTeams) {
+        let teamsInGroup = [...groupedTeams[group]];
+        
+        // สุ่มลำดับทีม (Shuffle) เพื่อให้การจับคู่เปลี่ยนไปทุกครั้งที่กด
+        teamsInGroup = teamsInGroup.sort(() => Math.random() - 0.5);
 
-        let teamStatsMap = {};
-        let groupTeams = tournamentTeams.filter(t => t.group === group).map(t => {
-            return {
-                id: t.id, name: t.name, played: 0, won: 0, drawn: 0, lost: 0,
-                gf: 0, ga: 0, gd: 0, pts: 0, isBestHighlight: false // เพิ่ม Property ไฮไลท์
-            };
-        });
-
-        groupTeams.forEach(t => teamStatsMap[t.id] = t);
-
-        allGroupMatches.forEach(match => {
-            if (match.scoreHome !== null && match.scoreAway !== null) {
-                let home = teamStatsMap[match.home.id];
-                let away = teamStatsMap[match.away.id];
-                if(home && away) {
-                    home.played++; away.played++;
-                    home.gf += match.scoreHome; home.ga += match.scoreAway;
-                    away.gf += match.scoreAway; away.ga += match.scoreHome;
-
-                    if (match.scoreHome > match.scoreAway) { home.won++; home.pts += 3; away.lost++; }
-                    else if (match.scoreHome < match.scoreAway) { away.won++; away.pts += 3; home.lost++; }
-                    else { home.drawn++; home.pts += 1; away.drawn++; away.pts += 1; }
-                    
-                    home.gd = home.gf - home.ga; away.gd = away.gf - away.ga;
-                }
-            }
-        });
-
-        let sortedTeams = advancedTournamentSort(groupTeams, allGroupMatches, tiebreakerMethod);
-        allGroupsStandings[group] = sortedTeams;
+        // สร้างการจับคู่แบบพบกันหมด (Round-Robin Algorithm)
+        const groupFixtures = generateRoundRobin(teamsInGroup, playRoundsMultiplier);
+        fixturesData[group] = groupFixtures;
+        
+        if (groupFixtures.length > maxRoundsGlobal) {
+            maxRoundsGlobal = groupFixtures.length;
+        }
     }
 
-    // แทรกโค้ดบรรทัดนี้ลงไป เพื่อส่งออกตัวแปรให้แท็บ 6 นำไปใช้ต่อได้
-    window.globalAllGroupsStandings = allGroupsStandings;
-
-    // 3. --- ระบบเปรียบเทียบทีมข้ามกลุ่ม (Cross-Group Highlight) --- (นี่คือบรรทัดเดิมของคุณ)
-    const isHighlightEnabled = document.getElementById('enableBestHighlight') && document.getElementById('enableBestHighlight').checked;
+    renderFixturesUI();
     
-    if (isHighlightEnabled && typeof getHighlightConfig === 'function') {
-        const config = getHighlightConfig();
-        
-        // วนลูปตามอันดับ (เช่น อันดับ 1, อันดับ 2...)
-        for (const rankStr in config) {
-            const targetRank = parseInt(rankStr);
-            const numToHighlight = config[targetRank];
+    // อัปเดตล้างตารางคะแนนในแท็บ 4 ให้สอดคล้องกับโปรแกรมใหม่
+    if (typeof updateStandings === 'function') {
+        updateStandings();
+    }
+}
+
+// 2. อัลกอริทึมจัดตารางแบบพบกันหมด (Round-Robin)
+function generateRoundRobin(teams, multiplier) {
+    let schedule = [];
+    let isOdd = teams.length % 2 !== 0;
+    let localTeams = [...teams];
+    
+    // ถ้ามีจำนวนทีมเป็นคี่ ให้เพิ่มทีมดัมมี่เข้าไปเพื่อทำหน้าที่เป็น "ทีมที่ได้พัก (Bye)"
+    if (isOdd) {
+        localTeams.push({ id: 'BYE', name: 'BYE' });
+    }
+
+    let numTeams = localTeams.length;
+    let rounds = numTeams - 1;
+    let halfSize = numTeams / 2;
+
+    // วนลูปตามตัวคูณจำนวนรอบ (เช่น แข่งเหย้า-เยือน ตัวคูณ = 2)
+    for (let m = 0; m < multiplier; m++) {
+        // วนจัดคู่แต่ละรอบการแข่งขัน
+        for (let round = 0; round < rounds; round++) {
+            let roundMatches = [];
             
-            if (numToHighlight > 0) {
-                const arrIndex = targetRank - 1; // Index ใน Array จะน้อยกว่าอันดับอยู่ 1
-                let teamsAtThisRank = [];
+            for (let i = 0; i < halfSize; i++) {
+                let home = localTeams[i];
+                let away = localTeams[numTeams - 1 - i];
                 
-                // ดึงทีมที่ได้อันดับเป้าหมายจากทุกกลุ่มมาไว้ในตระกร้าเดียวกัน
-                for (const group in allGroupsStandings) {
-                    if (allGroupsStandings[group].length > arrIndex) {
-                        teamsAtThisRank.push(allGroupsStandings[group][arrIndex]);
-                    }
+                // สลับเหย้าเยือนในการเจอกันรอบที่สอง
+                if (m % 2 !== 0) {
+                    let temp = home; home = away; away = temp;
                 }
-                
-                // จัดอันดับข้ามกลุ่ม: คะแนน -> ผลต่าง -> ประตูได้
-                teamsAtThisRank.sort((a, b) => {
-                    if (b.pts !== a.pts) return b.pts - a.pts;
-                    if (b.gd !== a.gd) return b.gd - a.gd;
-                    if (b.gf !== a.gf) return b.gf - a.gf;
-                    return 0; 
-                });
-                
-                // เปิดสวิตช์ไฮไลท์ให้กับทีมที่ดีที่สุดตามจำนวนที่ผู้ใช้ตั้งค่าไว้
-                for (let i = 0; i < Math.min(numToHighlight, teamsAtThisRank.length); i++) {
-                    teamsAtThisRank[i].isBestHighlight = true;
+
+                // ข้ามการจับคู่ถ้าทีมใดทีมหนึ่งคือทีมดัมมี่ (ได้พัก)
+                if (home.id !== 'BYE' && away.id !== 'BYE') {
+                    roundMatches.push({
+                        home: home,
+                        away: away,
+                        scoreHome: null,
+                        scoreAway: null,
+                        resultExport: "รอผลแข่ง"
+                    });
                 }
             }
+            schedule.push(roundMatches);
+            
+            // หมุนเวียนทีม (Rotation) เพื่อจัดคู่ในรอบถัดไป
+            localTeams.splice(1, 0, localTeams.pop());
         }
     }
-
-    // 4. นำผลลัพธ์ที่ติดป้ายไฮไลท์แล้ว ส่งไปวาด UI
-    for (const group in allGroupsStandings) {
-        renderGroupTableUI(group, allGroupsStandings[group], container);
-    }
+    return schedule;
 }
 
-// 2. อัลกอริทึมจัดหมวดหมู่แยกกลุ่มทีมที่แต้มเท่ากัน (Bucket Sort Structure)
-function advancedTournamentSort(teams, matches, method) {
-    // ขั้นแรก: เรียงลำดับคะแนนรวมหลักจากมากไปน้อยก่อน
-    teams.sort((a, b) => b.pts - a.pts);
-
-    // แบ่งกลุ่มทีมที่มีคะแนนดิบเท่ากันให้อยู่ในตระกร้า (Buckets) เดียวกัน
-    let buckets = [];
-    let currentBucket = [teams[0]];
-
-    for (let i = 1; i < teams.length; i++) {
-        if (teams[i].pts === currentBucket[0].pts) {
-            currentBucket.push(teams[i]);
-        } else {
-            buckets.push(currentBucket);
-            currentBucket = [teams[i]];
-        }
-    }
-    buckets.push(currentBucket);
-
-    // นำทีมในแต่ละตระกร้าที่มีคะแนนเท่ากันมาตัดสินด้วยกฎ Tiebreaker
-    let finalSortedList = [];
-    buckets.forEach(bucket => {
-        if (bucket.length === 1) {
-            finalSortedList.push(bucket[0]); // มีทีมเดียวไม่ต้องตัดสินเพิ่ม
-        } else {
-            let resolvedBucket = resolveGroupTiebreaker(bucket, matches, method);
-            finalSortedList.push(...resolvedBucket);
-        }
-    });
-
-    return finalSortedList;
-}
-
-// 3. ฟังก์ชันตัดสินไทเบรกเกอร์เมื่อมีทีมคะแนนเท่ากัน (Resolve Tie)
-function resolveGroupTiebreaker(tiedTeams, matches, method) {
-    if (tiedTeams.length <= 1) return tiedTeams;
-
-    if (method === 'direct') {
-        // กฎโดยตรง: พิจารณา ผลต่างประตูรวม -> ประตูได้รวม 
-        tiedTeams.sort((a, b) => {
-            if (b.gd !== a.gd) return b.gd - a.gd;
-            if (b.gf !== a.gf) return b.gf - a.gf;
-            return 0;
-        });
-
-        // เช็กเผื่อมีกรณีที่ ผลต่างและประตูได้รวมยังเท่ากันอีก ให้ส่งไปตัดสินด้วย มินิลีก (H2H) ต่อไป
-        return breakRemainingTiesWithMiniLeague(tiedTeams, matches);
-    } else {
-        // กฎเฮดทูเฮด: พิจารณา มินิลีก (H2H) ก่อนเป็นอันดับแรก
-        let h2hSorted = sortByMiniLeague(tiedTeams, matches);
-
-        // เช็กเผื่อในมินิลีกยังเท่ากันทุกสถิติ ให้ตัดสินด้วยสถิติภาพรวม (ผลต่างรวม -> ประตูได้รวม)
-        let subBuckets = [];
-        let curr = [h2hSorted[0]];
-        for (let i = 1; i < h2hSorted.length; i++) {
-            if (h2hSorted[i].ml_pts === curr[0].ml_pts && h2hSorted[i].ml_gd === curr[0].ml_gd && h2hSorted[i].ml_gf === curr[0].ml_gf) {
-                curr.push(h2hSorted[i]);
-            } else {
-                subBuckets.push(curr);
-                curr = [h2hSorted[i]];
-            }
-        }
-        subBuckets.push(curr);
-
-        let finalResult = [];
-        subBuckets.forEach(sb => {
-            if (sb.length === 1) {
-                finalResult.push(sb[0]);
-            } else {
-                // หากมินิลีกยังเท่ากัน ตัดสินด้วย ผลต่างรวม -> ประตูได้รวม
-                sb.sort((a, b) => {
-                    if (b.gd !== a.gd) return b.gd - a.gd;
-                    if (b.gf !== a.gf) return b.gf - a.gf;
-                    return 0;
-                });
-                finalResult.push(...sb);
-            }
-        });
-        return finalResult;
-    }
-}
-
-// 4. ฟังก์ชันย่อยสำหรับสกัดหาและคำนวณคะแนน "มินิลีก" (Mini-League / H2H สำหรับ 2 ทีมขึ้นไป)
-function sortByMiniLeague(teams, matches) {
-    let tiedIds = teams.map(t => t.id);
-    let mlStats = {};
-    tiedIds.forEach(id => mlStats[id] = { pts: 0, gd: 0, gf: 0 });
-
-    // คำนวณสถิติเฉพาะการพบกันเองในกลุ่มทีมที่แต้มเท่ากันเท่านั้น
-    matches.forEach(m => {
-        if (tiedIds.includes(m.home.id) && tiedIds.includes(m.away.id)) {
-            if (m.scoreHome !== null && m.scoreAway !== null) {
-                mlStats[m.home.id].gf += m.scoreHome;
-                mlStats[m.home.id].gd += (m.scoreHome - m.scoreAway);
-                mlStats[m.away.id].gf += m.scoreAway;
-                mlStats[m.away.id].gd += (m.scoreAway - m.scoreHome);
-
-                if (m.scoreHome > m.scoreAway) {
-                    mlStats[m.home.id].pts += 3;
-                } else if (m.scoreHome < m.scoreAway) {
-                    mlStats[m.away.id].pts += 3;
-                } else {
-                    mlStats[m.home.id].pts += 1;
-                    mlStats[m.away.id].pts += 1;
-                }
-            }
-        }
-    });
-
-    // บันทึกค่าคะแนนมินิลีกเข้าสู่ Object ชั่วคราวเพื่อส่งตรวจสอบขั้นตอนถัดไป
-    teams.forEach(t => {
-        t.ml_pts = mlStats[t.id].pts;
-        t.ml_gd = mlStats[t.id].gd;
-        t.ml_gf = mlStats[t.id].gf;
-    });
-
-    // เรียงตามเกณฑ์มินิลีก: คะแนนมินิลีก -> ผลต่างมินิลีก -> ประตูได้มินิลีก
-    teams.sort((a, b) => {
-        if (b.ml_pts !== a.ml_pts) return b.ml_pts - a.ml_pts;
-        if (b.ml_gd !== a.ml_gd) return b.ml_gd - a.ml_gd;
-        if (b.ml_gf !== a.ml_gf) return b.ml_gf - a.ml_gf;
-        return 0;
-    });
-
-    return teams;
-}
-
-// 5. ฟังก์ชันสำหรับตัดเกณฑ์มินิลีกกรณีกฎแบบ "โดยตรง" ที่สถิติรวมเท่ากันเป๊ะ
-function breakRemainingTiesWithMiniLeague(tiedTeams, matches) {
-    let subBuckets = [];
-    let curr = [tiedTeams[0]];
-    for (let i = 1; i < tiedTeams.length; i++) {
-        if (tiedTeams[i].gd === curr[0].gd && tiedTeams[i].gf === curr[0].gf) {
-            curr.push(tiedTeams[i]);
-        } else {
-            subBuckets.push(curr);
-            curr = [tiedTeams[i]];
-        }
-    }
-    subBuckets.push(curr);
-
-    let finalResult = [];
-    subBuckets.forEach(sb => {
-        if (sb.length === 1) {
-            finalResult.push(sb[0]);
-        } else {
-            let mlSorted = sortByMiniLeague(sb, matches);
-            finalResult.push(...mlSorted);
-        }
-    });
-    return finalResult;
-}
-
-// 6. ฟังก์ชันสร้างตาราง HTML ตารางคะแนน
-// อัปเดตฟังก์ชันนี้เพื่อรับคลาสไฮไลท์
-function renderGroupTableUI(groupName, sortedTeams, parentContainer) {
-    const groupWrapper = document.createElement('div');
-    groupWrapper.className = 'group-container';
+// 3. ฟังก์ชันสร้างหน้าตา UI สำหรับแท็บ 3
+function renderFixturesUI() {
+    const fifaContainer = document.getElementById('fifaDayContainer');
+    const fixturesContainer = document.getElementById('fixturesContainer');
     
-    let tableHTML = `
-        <div class="group-header">ตารางคะแนน กลุ่มที่ ${groupName}</div>
-        <table class="standings-table">
-            <thead>
-                <tr>
-                    <th style="width: 8%;">อันดับ</th>
-                    <th>ทีม</th>
-                    <th style="width: 10%;">แข่ง</th>
-                    <th style="width: 8%;">ชนะ</th>
-                    <th style="width: 8%;">เสมอ</th>
-                    <th style="width: 8%;">แพ้</th>
-                    <th style="width: 10%;">ได้</th>
-                    <th style="width: 10%;">เสีย</th>
-                    <th style="width: 10%;">ผลต่าง</th>
-                    <th style="width: 12%;">คะแนน</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
-
-    sortedTeams.forEach((team, index) => {
-        const displayGD = team.gd > 0 ? `+${team.gd}` : team.gd;
-        // ตรวจสอบสถานะว่าทีมนี้ถูกทำสัญลักษณ์ไฮไลท์ไว้หรือไม่
-        const rowHighlightClass = team.isBestHighlight ? 'highlight-best' : '';
-        
-        tableHTML += `
-            <tr class="${rowHighlightClass}">
-                <td>${index + 1}</td>
-                <td class="team-cell">${team.name} (${team.id})</td>
-                <td>${team.played}</td>
-                <td>${team.won}</td>
-                <td>${team.drawn}</td>
-                <td>${team.lost}</td>
-                <td>${team.gf}</td>
-                <td>${team.ga}</td>
-                <td>${displayGD}</td>
-                <td class="pts-cell">${team.pts}</td>
-            </tr>
+    // -- สร้างช่องกรอกฟีฟ่าเดย์ด้านบน --
+    fifaContainer.style.display = 'block';
+    fifaContainer.innerHTML = '<h4>ตั้งค่าฟีฟ่าเดย์</h4>';
+    for (let r = 1; r <= maxRoundsGlobal; r++) {
+        fifaContainer.innerHTML += `
+            <div class="fifa-day-row">
+                <label>รอบที่ ${r} :</label>
+                <input type="text" id="fifaDayInput_R${r}" placeholder="เช่น 1, 2, 3..." onkeyup="updateFifaDayUI(${r}, this.value)">
+            </div>
         `;
-    });
+    }
 
-    tableHTML += `</tbody></table>`;
-    groupWrapper.innerHTML = tableHTML;
-    parentContainer.appendChild(groupWrapper);
+    // -- สร้างรายการแข่ง --
+    fixturesContainer.innerHTML = '';
+    
+    for (const group in fixturesData) {
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'group-container';
+        
+        // ชื่อกลุ่ม
+        groupDiv.innerHTML += `<div class="group-header">กลุ่มที่ ${group}</div>`;
+        
+        // ดึงรอบของกลุ่มนั้น
+        fixturesData[group].forEach((roundMatches, roundIndex) => {
+            const actualRoundNum = roundIndex + 1;
+            
+            // หัวข้อของรอบนั้นๆ
+            groupDiv.innerHTML += `<div class="round-header" id="roundHeader_${group}_R${actualRoundNum}">รอบที่ ${actualRoundNum} - ฟีฟ่าเดย์ที่ <span class="fd-display-r${actualRoundNum}">...</span></div>`;
+            
+            // รายชื่อคู่แข่งในรอบ
+            // ค้นหาและแทนที่ส่วนนี้ใน renderFixturesUI 
+roundMatches.forEach((match, matchIndex) => {
+    const matchId = `match_${group}_R${actualRoundNum}_M${matchIndex}`;
+    
+    // ตรวจสอบว่าคู่นี้ถูกสุ่มผลไปแล้วหรือยัง เพื่อดึงตัวเลขสกอร์มาโชว์ตอนวาดหน้าจอใหม่
+    const btnText = (match.scoreHome !== null && match.scoreAway !== null) 
+        ? `${match.scoreHome} - ${match.scoreAway}` 
+        : "สุ่มผล";
+
+    groupDiv.innerHTML += `
+        <div class="match-item">
+            <div class="match-row">
+                <span class="team-name home">${match.home.name}</span>
+                <button id="btn_${matchId}" class="btn-simulate" onclick="simulateMatch('${group}', ${roundIndex}, ${matchIndex}, '${matchId}')">${btnText}</button>
+                <span class="team-name away">${match.away.name}</span>
+                <button class="btn-clear-match" onclick="clearMatchResult('${group}', ${roundIndex}, ${matchIndex}, '${matchId}')" title="ล้างผลคู่นี้">✖</button>
+            </div>
+            <div class="export-code" id="export_${matchId}">
+                ${match.resultExport}
+            </div>
+        </div>
+    `;
+});
+        });
+        
+        fixturesContainer.appendChild(groupDiv);
+    }
+}
+
+// 4. ฟังก์ชันจัดการเมื่อผู้ใช้พิมพ์กำหนดฟีฟ่าเดย์ที่ส่วนบนสุด
+function updateFifaDayUI(roundNum, value) {
+    const displayValue = value.trim() === '' ? '...' : value;
+    const coefficient = document.getElementById('coefficient').value || 35;
+    
+    // อัปเดตตัวหนังสือในหัวรอบ (เช่น ฟีฟ่าเดย์ที่ 1)
+    const elements = document.querySelectorAll(`.fd-display-r${roundNum}`);
+    elements.forEach(el => el.innerText = displayValue);
+
+    // อัปเดต Export String เฉพาะคู่ที่มีการสุ่มผลไปแล้วในรอบนั้น
+    for (const group in fixturesData) {
+        const roundIndex = roundNum - 1;
+        if(fixturesData[group][roundIndex]) {
+            fixturesData[group][roundIndex].forEach((match, matchIndex) => {
+                if (match.scoreHome !== null && match.scoreAway !== null) {
+                    const matchId = `match_${group}_R${roundNum}_M${matchIndex}`;
+                    updateExportString(match, value, coefficient, matchId);
+                }
+            });
+        }
+    }
+}
+
+// ฟังก์ชันจำลองผลสกอร์ (อัปเดตใช้อัลกอริทึม Poisson Distribution และ OVR)
+// ค้นหาและแทนที่ฟังก์ชัน simulateMatch ทั้งหมดด้วยโค้ดนี้
+function simulateMatch(group, roundIndex, matchIndex, matchId) {
+    const match = fixturesData[group][roundIndex][matchIndex];
+    
+    // 1. ดึงค่าพลัง (OVR) อัปเดตล่าสุดจากฐานข้อมูลหลัก tournamentTeams โดยเทียบจาก ID ทีม
+    const currentHome = tournamentTeams.find(t => t.id === match.home.id);
+    const currentAway = tournamentTeams.find(t => t.id === match.away.id);
+    
+    // ค้นหาส่วนนี้ในฟังก์ชัน simulateMatch แล้วเปลี่ยนเป็น:
+    
+// 1. ดึงค่าพลัง (OVR) อัปเดตล่าสุดจากระบบ Dynamic OVR
+    const homePower = getDynamicOvr(match.home.id);
+    const awayPower = getDynamicOvr(match.away.id);
+    
+    // 2. คำนวณความต่างของค่าพลังและค่า Expected Goals (Poisson)
+    const powerDiff = homePower - awayPower;
+    const lambdaHome = Math.max(0.1, 1.3 + (powerDiff * 0.03));
+    const lambdaAway = Math.max(0.1, 1.3 - (powerDiff * 0.03));
+    
+    // 3. สุ่มประตู
+    match.scoreHome = poissonRandom(lambdaHome);
+    match.scoreAway = poissonRandom(lambdaAway);
+
+    // อัปเดตปุ่มสุ่มผลเป็นสกอร์
+    const btn = document.getElementById(`btn_${matchId}`);
+    btn.innerText = `${match.scoreHome} - ${match.scoreAway}`;
+
+    // ส่งข้อมูลไปสร้างรหัส Export Text
+    const roundNum = roundIndex + 1;
+    const fdInput = document.getElementById(`fifaDayInput_R${roundNum}`);
+    const fdValue = fdInput ? (fdInput.value || "...") : "...";
+    const coefficient = document.getElementById('coefficient').value || 35;
+    
+    updateExportString(match, fdValue, coefficient, matchId);
+
+    // อัปเดตตารางคะแนน
+    if (typeof updateStandings === 'function') {
+        updateStandings();
+    }
+}
+
+// 6. ฟังก์ชันคำนวณและอัปเดต Export String (fd,id1,r,id2,c)
+// ฟังก์ชันคำนวณและอัปเดต Export String
+function updateExportString(match, fdValue, coefficient, matchId) {
+    let resultHomeStr = "";
+    if (match.scoreHome > match.scoreAway) {
+        resultHomeStr = "w";
+    } else if (match.scoreHome < match.scoreAway) {
+        resultHomeStr = "l";
+    } else {
+        resultHomeStr = "d";
+    }
+
+    // อัปเดตรูปแบบการส่งออกให้มี ,g ต่อท้าย
+    const exportStr = `${fdValue},${match.home.id},${resultHomeStr},${match.away.id},${coefficient},g`;
+    match.resultExport = exportStr;
+
+    // อัปเดต UI หน้าจอในแท็บที่ 3
+    const exportDiv = document.getElementById(`export_${matchId}`);
+    if (exportDiv) {
+        exportDiv.innerText = exportStr;
+    }
+}
+
+// ฟังก์ชันคณิตศาสตร์สำหรับสุ่มตัวเลขตามหลัก Poisson Distribution
+function poissonRandom(expectedValue) {
+    const L = Math.exp(-expectedValue);
+    let k = 0;
+    let p = 1.0;
+    while (true) {
+        p = p * Math.random();
+        if (p <= L) {
+            break;
+        }
+        k++;
+    }
+    return k;
+}
+
+// นำโค้ดนี้ไปต่อท้ายไฟล์ tab3.js
+function updateCoefficientUI(newVal) {
+    const coeff = newVal || 35;
+    if (!fixturesData) return;
+    
+    // วนลูปอัปเดต Export String เฉพาะคู่ที่มีผลสกอร์แล้วในทุกกลุ่มและทุกรอบ
+    for (const group in fixturesData) {
+        fixturesData[group].forEach((roundMatches, roundIndex) => {
+            const roundNum = roundIndex + 1;
+            const fdInput = document.getElementById(`fifaDayInput_R${roundNum}`);
+            const fdValue = fdInput ? (fdInput.value || "...") : "...";
+            
+            roundMatches.forEach((match, matchIndex) => {
+                if (match.scoreHome !== null && match.scoreAway !== null) {
+                    const matchId = `match_${group}_R${roundNum}_M${matchIndex}`;
+                    updateExportString(match, fdValue, coeff, matchId);
+                }
+            });
+        });
+    }
+}
+
+// ฟังก์ชันล้างผลการแข่งขันรายคู่
+function clearMatchResult(group, roundIndex, matchIndex, matchId) {
+    const match = fixturesData[group][roundIndex][matchIndex];
+    
+    // เช็กว่าคู่นี้ยังไม่ได้สุ่มผล ก็ไม่ต้องทำอะไร
+    if (match.scoreHome === null && match.scoreAway === null) return;
+
+    // รีเซ็ตค่าสถิติ
+    match.scoreHome = null;
+    match.scoreAway = null;
+    match.resultExport = "รอผลแข่ง";
+
+    // อัปเดตหน้าจอเฉพาะคู่ที่ถูกกดล้างข้อมูล
+    document.getElementById(`btn_${matchId}`).innerText = "สุ่มผล";
+    document.getElementById(`export_${matchId}`).innerText = "รอผลแข่ง";
+
+    // อัปเดตตารางคะแนน (แท็บ 4) ใหม่แบบเรียลไทม์
+    if (typeof updateStandings === 'function') {
+        updateStandings();
+    }
+}
+
+// ฟังก์ชันคำนวณค่า OVR ปัจจุบัน ณ วินาทีนั้นแบบไดนามิก
+function getDynamicOvr(teamId) {
+    const team = tournamentTeams.find(t => t.id === teamId);
+    if (!team) return 50; // กัน Error คืนค่ากลาง 50
+    
+    let currentOvr = team.ovr; // เริ่มต้นที่ OVR พื้นฐาน
+    const isEnabled = document.getElementById('enableAutoOvr') && document.getElementById('enableAutoOvr').checked;
+    
+    if (isEnabled && fixturesData) {
+        const winAdj = parseInt(document.getElementById('ovr_adj_win').value) || 0;
+        const drawAdj = parseInt(document.getElementById('ovr_adj_draw').value) || 0;
+        const lossAdj = parseInt(document.getElementById('ovr_adj_loss').value) || 0;
+        
+        let w = 0, d = 0, l = 0;
+        
+        // กวาดนับผลการแข่งขันทั้งหมดของทีมนั้นที่ถูกสุ่มไว้แล้วในระบบ
+        for (const group in fixturesData) {
+            fixturesData[group].forEach(roundMatches => {
+                roundMatches.forEach(match => {
+                    if (match.scoreHome !== null && match.scoreAway !== null) {
+                        if (match.home.id === teamId) {
+                            if (match.scoreHome > match.scoreAway) w++;
+                            else if (match.scoreHome === match.scoreAway) d++;
+                            else l++;
+                        } else if (match.away.id === teamId) {
+                            if (match.scoreAway > match.scoreHome) w++;
+                            else if (match.scoreAway === match.scoreHome) d++;
+                            else l++;
+                        }
+                    }
+                });
+            });
+        }
+        
+        // ปรับค่าพลังสุทธิ (ไม่สนลำดับ สนแค่จำนวนรวม ณ ตอนนี้)
+        currentOvr += (w * winAdj) + (d * drawAdj) + (l * lossAdj);
+    }
+    
+    // บังคับไม่ให้เกิน 99 และไม่ให้ต่ำกว่า 1
+    return Math.max(1, Math.min(99, currentOvr));
 }
